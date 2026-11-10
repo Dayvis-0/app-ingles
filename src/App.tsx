@@ -1,65 +1,39 @@
-import { useEffect, useState } from "react";
-import { supabase } from "./lib/supabase";
+import { useAuth } from "./context/AuthContext";
+import LoginView from "./components/LoginView";
 
-type SupabaseProbe = {
-  status: "probing" | "ok" | "error";
-  detail: string;
-};
-
-/** Pantalla temporal del Sprint 1 (Dayvis).
- *  Solo verifica: Tailwind activo + conexión a Supabase sin explotar.
- *  Se reemplaza por el login real (tarea de Yunior/Dayvis del Sprint 1). */
+/**
+ * Login flow scaffold for Sprint (HU01): shows the login screen until a
+ * session exists, then a minimal temporary session card. The role-based
+ * redirect / protected routes are a separate teammate task and will replace
+ * this card.
+ */
 function App() {
-  const [probe, setProbe] = useState<SupabaseProbe>({
-    status: "probing",
-    detail: "Consultando supabase.auth.getSession()...",
-  });
+  const { user, role, logout } = useAuth();
 
-  useEffect(() => {
-    supabase.auth
-      .getSession()
-      .then(({ error }) => {
-        if (error) {
-          setProbe({ status: "error", detail: error.message });
-        } else {
-          setProbe({
-            status: "ok",
-            detail: "Conexión OK. Session = null (todavía no hay usuarios logueados).",
-          });
-        }
-      })
-      .catch((e: unknown) => {
-        setProbe({
-          status: "error",
-          detail: e instanceof Error ? e.message : String(e),
-        });
-      });
-  }, []);
+  if (!user) {
+    return <LoginView />;
+  }
 
   return (
-    <main className="min-h-screen bg-slate-900 text-slate-50 flex flex-col items-center justify-center gap-4 p-8">
-      <h1 className="text-3xl font-black text-emerald-400">
-        app-ingles · Sprint 1
-      </h1>
-
-      <section className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md text-center">
-        <p className="text-sm text-slate-400 mb-2">
-          Tailwind activo (fondo oscuro + tarjeta) y conexión Supabase:
-        </p>
-        <p
-          className={
-            probe.status === "ok"
-              ? "text-emerald-400 font-bold"
-              : probe.status === "error"
-                ? "text-red-400 font-bold"
-                : "text-slate-300 font-bold animate-pulse"
-          }
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <section className="w-full max-w-md bg-white duo-card p-8 shadow-xl flex flex-col items-center gap-3 text-center">
+        <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
+          Sesión iniciada
+        </div>
+        <h1 className="text-2xl font-black tracking-tight text-[#3c3c3c]">
+          {user.nombreCompleto}
+        </h1>
+        <p className="text-sm font-bold text-[#afafaf]">@{user.nombreUsuario}</p>
+        <span className="bg-emerald-100 text-emerald-800 rounded-full px-4 py-1.5 text-xs font-black uppercase tracking-widest">
+          {role}
+        </span>
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-3 w-full py-3 font-black rounded-xl tracking-wider cursor-pointer btn-3d-green"
         >
-          {probe.status === "probing" && "⏳ probando..."}
-          {probe.status === "ok" && "✅ Supabase conectado"}
-          {probe.status === "error" && "❌ Error de Supabase"}
-        </p>
-        <p className="text-xs text-slate-500 mt-3 break-words">{probe.detail}</p>
+          CERRAR SESIÓN
+        </button>
       </section>
     </main>
   );
