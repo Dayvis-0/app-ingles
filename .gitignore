@@ -27,3 +27,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Lock files (usar pnpm)
+package-lock.json
+yarn.lock
+
