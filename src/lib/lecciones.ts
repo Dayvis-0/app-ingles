@@ -183,3 +183,22 @@ export async function toggleLeccionEstado(
 
   return Boolean(data?.estado_activo);
 }
+
+/**
+ * Lista todas las lecciones activas del sistema (HU05 - Dayvis).
+ * El estudiante visualiza lecciones de cualquier docente con estado_activo = true.
+ */
+export async function fetchLeccionesActivas(): Promise<Leccion[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("estado_activo", true)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching lecciones activas:", error);
+    throw new Error("No se pudieron cargar las lecciones.");
+  }
+
+  return data ?? [];
+}
