@@ -3,7 +3,7 @@ import { AlertCircle, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { HeaderBar } from "./ui";
 import { LessonForm, LessonList } from "./docente";
-import type { Leccion } from "../types/database";
+import type { LeccionConContenido, LeccionInput } from "../lib/lecciones";
 import {
   deleteLeccion,
   fetchLecciones,
@@ -15,10 +15,10 @@ import {
 export default function DocenteView() {
   const { user, logout } = useAuth();
   const [docenteId, setDocenteId] = useState<number | null>(null);
-  const [lessons, setLessons] = useState<Leccion[]>([]);
+  const [lessons, setLessons] = useState<LeccionConContenido[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<Leccion | null>(null);
+  const [editingLesson, setEditingLesson] = useState<LeccionConContenido | null>(null);
   const [docenteError, setDocenteError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -78,11 +78,7 @@ export default function DocenteView() {
     }
   }, []);
 
-  const handleSave = async (data: {
-    id?: string;
-    titulo: string;
-    estado_activo: boolean;
-  }) => {
+  const handleSave = async (data: LeccionInput) => {
     if (!docenteId) {
       throw new Error("No se encontró el perfil del docente.");
     }
@@ -157,7 +153,7 @@ export default function DocenteView() {
     }
   };
 
-  const handleEdit = (lesson: Leccion) => {
+  const handleEdit = (lesson: LeccionConContenido) => {
     setActionError(null);
     setEditingLesson(lesson);
     window.scrollTo({ top: 0, behavior: "smooth" });

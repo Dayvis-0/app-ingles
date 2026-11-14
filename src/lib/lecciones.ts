@@ -1,20 +1,66 @@
 import { supabase } from "./supabase";
-import type { Leccion } from "../types/database";
+import type {
+  Gramatica,
+  GramaticaColumna,
+  Leccion,
+  Vocabulario,
+} from "../types/database";
 
 /**
- * Capa de acceso a datos de lecciones (HU03 - Yunior).
- * Operaciones: listar, guardar (crear/editar), eliminar y activar/desactivar.
+ * Capa de acceso a datos de lecciones (HU03 - Yunior, extendido HU04 - Jhermy).
+ * Operaciones: listar, guardar (crear/editar), eliminar y activar/desactivar,
+ * incluyendo el contenido de vocabulario y gramática por lección.
  * Todas las escrituras validan que la lección pertenezca al docente autenticado.
  */
 
 const TABLE = "leccion";
 const TITULO_MAX_LENGTH = 150;
 
+export type VocabularioItem = {
+  ingles: string;
+  espanol: string;
+  categoria: string;
+};
+
+export type GramaticaInput = {
+  nombre_tema: string;
+  explicacion: string;
+  formula: string;
+  ejemplo: string;
+  gramatica_columnas: GramaticaColumna[];
+  ejemplo_roles: string[];
+};
+
+export type LeccionConContenido = Leccion & {
+  vocabulario: VocabularioItem[];
+  gramatica: GramaticaInput | null;
+};
+
 export type LeccionInput = {
   id?: string;
   titulo: string;
   estado_activo: boolean;
+  vocabulario?: VocabularioItem[];
+  gramatica?: GramaticaInput;
 };
+
+export const DEFAULT_GRAMATICA_TITULO = "PRESENT SIMPLE";
+export const DEFAULT_GRAMATICA_DESC = "Rutinas Diarias";
+export const DEFAULT_GRAMATICA_FORMULA =
+  "Subject + Verb (-s/-es) + Complement";
+export const DEFAULT_GRAMATICA_COLUMNAS: GramaticaColumna[] = [
+  { titulo: "I / You / We / They", verbo: "PLAY", nota: "Every Saturday" },
+  {
+    titulo: "He / She / It",
+    verbo: "PLAYS",
+    nota: "Adds -s / -es\ne.g. works, studies",
+  },
+  {
+    titulo: "FORMULA",
+    verbo: "S + Verb(-s) + Complement",
+    nota: "e.g. She eats an apple.",
+  },
+];
 
 function normalizeTitulo(titulo: string): string {
   const value = titulo.trim();
@@ -62,8 +108,13 @@ export async function getDocenteIdByUsuario(
   return data?.id_docente ?? null;
 }
 
-/** Lista las lecciones de un docente, ordenadas por fecha de creación. */
-export async function fetchLecciones(docenteId: number): Promise<Leccion[]> {
+/**
+ * Lista las lecciones de un docente junto con su vocabulario y gramática,
+ * ordenadas por fecha de creación.
+ */
+export async function fetchLecciones(
+  docenteId: number,
+): Promise<LeccionConContenido[]> {
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
@@ -75,11 +126,70 @@ export async function fetchLecciones(docenteId: number): Promise<Leccion[]> {
     throw new Error("No se pudieron cargar las lecciones.");
   }
 
-  return data ?? [];
+  const lecciones = (data ?? []) as Leccion[];
+  if (lecciones.length === 0) {
+    return [];
+  }
+
+  const ids = lecciones.map((l) => l.id_leccion);
+
+  const [vocabRes, gramRes] = await Promise.all([
+    supabase
+      .from("vocabulario")
+      .select("*")
+      .in("id_leccion", ids)
+      .order("orden", { ascending: true }),
+    supabase.from("gramatica").select("*").in("id_leccion", ids),
+  ]);
+
+  let vocabRows: Vocabulario[] = [];
+  if (vocabRes.error) {
+    console.warn("No se pudo cargar vocabulario (migración pendiente?):", vocabRes.error.message);
+  } else {
+    vocabRows = (vocabRes.data ?? []) as Vocabulario[];
+  }
+
+  let gramRows: Gramatica[] = [];
+  if (gramRes.error) {
+    console.warn("No se pudo cargar gramática (migración pendiente?):", gramRes.error.message);
+  } else {
+    gramRows = (gramRes.data ?? []) as Gramatica[];
+  }
+
+  const vocabByLesson = new Map<string, VocabularioItem[]>();
+  for (const row of vocabRows) {
+    const list = vocabByLesson.get(row.id_leccion) ?? [];
+    list.push({
+      ingles: row.palabra_ingles,
+      espanol: row.traduccion_espanol,
+      categoria: "Sustantivo",
+    });
+    vocabByLesson.set(row.id_leccion, list);
+  }
+
+  const gramByLesson = new Map<string, GramaticaInput>();
+  for (const row of gramRows) {
+    gramByLesson.set(row.id_leccion, {
+      nombre_tema: row.nombre_tema,
+      explicacion: row.explicacion,
+      formula: row.formula ?? "",
+      ejemplo: row.ejemplo ?? "",
+      gramatica_columnas: Array.isArray(row.gramatica_columnas)
+        ? row.gramatica_columnas
+        : DEFAULT_GRAMATICA_COLUMNAS,
+      ejemplo_roles: Array.isArray(row.ejemplo_roles) ? row.ejemplo_roles : [],
+    });
+  }
+
+  return lecciones.map((leccion) => ({
+    ...leccion,
+    vocabulario: vocabByLesson.get(leccion.id_leccion) ?? [],
+    gramatica: gramByLesson.get(leccion.id_leccion) ?? null,
+  }));
 }
 
 /**
- * Crea o actualiza una lección.
+ * Crea o actualiza una lección y persiste su vocabulario y gramática si se proveen.
  * - Con `id`: actualiza solo si pertenece al docente.
  * - Sin `id`: inserta una nueva lección con un ID único.
  */
@@ -89,6 +199,8 @@ export async function saveLeccion(
 ): Promise<Leccion> {
   const titulo = normalizeTitulo(input.titulo);
   const now = new Date().toISOString();
+
+  let savedLeccion: Leccion;
 
   if (input.id) {
     const { data, error } = await supabase
@@ -108,28 +220,93 @@ export async function saveLeccion(
       throw new Error("No se pudo actualizar la lección.");
     }
 
-    return data as Leccion;
+    savedLeccion = data as Leccion;
+  } else {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .insert({
+        id_leccion: newLeccionId(),
+        id_docente: idDocente,
+        titulo,
+        estado_activo: input.estado_activo,
+        created_at: now,
+        updated_at: now,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("Error inserting leccion:", error);
+      throw new Error("No se pudo crear la lección.");
+    }
+
+    savedLeccion = data as Leccion;
   }
 
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert({
-      id_leccion: newLeccionId(),
-      id_docente: idDocente,
-      titulo,
-      estado_activo: input.estado_activo,
-      created_at: now,
-      updated_at: now,
-    })
-    .select("*")
-    .single();
+  const id = savedLeccion.id_leccion;
 
-  if (error) {
-    console.error("Error inserting leccion:", error);
-    throw new Error("No se pudo crear la lección.");
+  if (input.vocabulario !== undefined) {
+    const { error: delVocabError } = await supabase
+      .from("vocabulario")
+      .delete()
+      .eq("id_leccion", id);
+
+    if (delVocabError) {
+      console.error("Error clearing vocabulario:", delVocabError);
+      throw new Error("No se pudo actualizar el vocabulario de la lección.");
+    }
+
+    const validVocab = input.vocabulario.filter((v) => v.ingles.trim() !== "");
+    if (validVocab.length > 0) {
+      const vocabPayload = validVocab.map((v, idx) => ({
+        id_leccion: id,
+        palabra_ingles: v.ingles.trim().slice(0, 100),
+        traduccion_espanol: (v.espanol.trim() || "—").slice(0, 100),
+        url_audio: null,
+        orden: idx + 1,
+      }));
+
+      const { error: insVocabError } = await supabase
+        .from("vocabulario")
+        .insert(vocabPayload);
+
+      if (insVocabError) {
+        console.error("Error inserting vocabulario:", insVocabError);
+        throw new Error("No se pudo guardar el vocabulario de la lección.");
+      }
+    }
   }
 
-  return data as Leccion;
+  if (input.gramatica !== undefined) {
+    const { error: delGramError } = await supabase
+      .from("gramatica")
+      .delete()
+      .eq("id_leccion", id);
+
+    if (delGramError) {
+      console.error("Error clearing gramatica:", delGramError);
+      throw new Error("No se pudo actualizar la gramática de la lección.");
+    }
+
+    const { error: insGramError } = await supabase.from("gramatica").insert({
+      id_leccion: id,
+      nombre_tema: (input.gramatica.nombre_tema.trim() || titulo).slice(0, 150),
+      explicacion: input.gramatica.explicacion.trim() || "",
+      formula: input.gramatica.formula.trim()
+        ? input.gramatica.formula.trim().slice(0, 100)
+        : null,
+      ejemplo: input.gramatica.ejemplo.trim() || null,
+      gramatica_columnas: input.gramatica.gramatica_columnas,
+      ejemplo_roles: input.gramatica.ejemplo_roles,
+    });
+
+    if (insGramError) {
+      console.error("Error inserting gramatica:", insGramError);
+      throw new Error("No se pudo guardar la gramática de la lección.");
+    }
+  }
+
+  return savedLeccion;
 }
 
 /** Elimina una lección del docente autenticado. */

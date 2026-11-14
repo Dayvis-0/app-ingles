@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { BookOpen, AlertCircle, Edit3, Trash2 } from "lucide-react";
-import type { Leccion } from "../../types/database";
+import type { LeccionConContenido } from "../../lib/lecciones";
 import { ModalConfirm } from "../ui";
 
 interface LessonListProps {
-  lessons: Leccion[];
+  lessons: LeccionConContenido[];
   loading: boolean;
-  onEdit: (lesson: Leccion) => void;
+  onEdit: (lesson: LeccionConContenido) => void;
   onDelete: (id: string) => Promise<void>;
   onToggle: (id: string, currentStatus: boolean) => Promise<void>;
 }
@@ -63,7 +63,9 @@ export default function LessonList({
           <div className="text-center py-8 text-slate-400">
             <AlertCircle className="w-10 h-10 stroke-[1.5] mx-auto mb-2 text-slate-300" />
             <p className="font-bold text-sm">No hay lecciones en la base de datos.</p>
-            <p className="text-xs text-slate-400 mt-1">Usá el formulario de la izquierda para crear una.</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Usá el formulario de la izquierda para crear una.
+            </p>
           </div>
         ) : (
           lessons.map((les) => {
@@ -96,20 +98,37 @@ export default function LessonList({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h5 className="text-sm md:text-base font-black text-slate-800 truncate" title={les.titulo}>
+                      <h5
+                        className="text-sm md:text-base font-black text-slate-800 truncate"
+                        title={les.titulo}
+                      >
                         {les.titulo}
                       </h5>
                       <span
                         className={`text-[10px] md:text-xs font-black uppercase px-2 py-0.5 rounded-lg ${
-                          isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
+                          isActive
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-slate-100 text-slate-500"
                         }`}
                       >
                         {isActive ? "Activa" : "Inactiva"}
                       </span>
+                      {les.vocabulario.length > 0 && (
+                        <span className="text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-lg bg-sky-50 text-sky-600 border border-sky-100">
+                          {les.vocabulario.length}{" "}
+                          {les.vocabulario.length === 1 ? "palabra" : "palabras"}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
-                      ID: {les.id_leccion}
-                    </p>
+                    {les.gramatica?.formula ? (
+                      <p className="text-xs md:text-sm text-slate-500 font-medium truncate mt-1">
+                        <b>Estructura:</b> {les.gramatica.formula}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+                        ID: {les.id_leccion}
+                      </p>
+                    )}
                   </div>
                 </div>
 
