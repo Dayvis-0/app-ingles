@@ -3,6 +3,7 @@ import { useAuth } from "./context/AuthContext";
 import LoginView from "./components/LoginView";
 import DocenteView from "./components/DocenteView";
 import EstudianteView from "./components/EstudianteView";
+import { EstudianteLeccionView } from "./components/estudiante";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function LoginRedirect() {
@@ -54,6 +55,14 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={["estudiante"]} />}>
           <Route path="/estudiante" element={<EstudianteView />} />
+          <Route
+            path="/estudiante/leccion/:idLeccion"
+            element={<EstudianteLeccionView />}
+          />
+          <Route
+            path="/estudiante/leccion/:idLeccion/:etapa"
+            element={<EstudianteLeccionView />}
+          />
         </Route>
 
         <Route path="*" element={<RootRedirect />} />

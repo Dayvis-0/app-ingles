@@ -108,25 +108,9 @@ export async function getDocenteIdByUsuario(
   return data?.id_docente ?? null;
 }
 
-/**
- * Lista las lecciones de un docente junto con su vocabulario y gramática,
- * ordenadas por fecha de creación.
- */
-export async function fetchLecciones(
-  docenteId: number,
+async function hydrateLeccionesContenido(
+  lecciones: Leccion[],
 ): Promise<LeccionConContenido[]> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("*")
-    .eq("id_docente", docenteId)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching lecciones:", error);
-    throw new Error("No se pudieron cargar las lecciones.");
-  }
-
-  const lecciones = (data ?? []) as Leccion[];
   if (lecciones.length === 0) {
     return [];
   }
@@ -144,14 +128,20 @@ export async function fetchLecciones(
 
   let vocabRows: Vocabulario[] = [];
   if (vocabRes.error) {
-    console.warn("No se pudo cargar vocabulario (migración pendiente?):", vocabRes.error.message);
+    console.warn(
+      "No se pudo cargar vocabulario (migración pendiente?):",
+      vocabRes.error.message,
+    );
   } else {
     vocabRows = (vocabRes.data ?? []) as Vocabulario[];
   }
 
   let gramRows: Gramatica[] = [];
   if (gramRes.error) {
-    console.warn("No se pudo cargar gramática (migración pendiente?):", gramRes.error.message);
+    console.warn(
+      "No se pudo cargar gramática (migración pendiente?):",
+      gramRes.error.message,
+    );
   } else {
     gramRows = (gramRes.data ?? []) as Gramatica[];
   }
@@ -186,6 +176,27 @@ export async function fetchLecciones(
     vocabulario: vocabByLesson.get(leccion.id_leccion) ?? [],
     gramatica: gramByLesson.get(leccion.id_leccion) ?? null,
   }));
+}
+
+/**
+ * Lista las lecciones de un docente junto con su vocabulario y gramática,
+ * ordenadas por fecha de creación.
+ */
+export async function fetchLecciones(
+  docenteId: number,
+): Promise<LeccionConContenido[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id_docente", docenteId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching lecciones:", error);
+    throw new Error("No se pudieron cargar las lecciones.");
+  }
+
+  return hydrateLeccionesContenido((data ?? []) as Leccion[]);
 }
 
 /**
@@ -379,3 +390,31 @@ export async function fetchLeccionesActivas(): Promise<Leccion[]> {
 
   return data ?? [];
 }
+
+/**
+ * Obtiene una lección activa por su ID junto con su vocabulario y gramática
+ * para el recorrido guiado de 5 etapas (HU06 - Jhermy).
+ */
+export async function fetchLeccionById(
+  idLeccion: string,
+): Promise<LeccionConContenido | null> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id_leccion", idLeccion)
+    .eq("estado_activo", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching leccion by id:", error);
+    throw new Error("No se pudo cargar la lección seleccionada.");
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const [hydrated] = await hydrateLeccionesContenido([data as Leccion]);
+  return hydrated ?? null;
+}
+

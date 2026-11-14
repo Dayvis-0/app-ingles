@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AlertCircle, GraduationCap, RotateCcw } from "lucide-react";
 import { HeaderBar } from "./ui";
 import { useAuth } from "../context/AuthContext";
@@ -23,6 +24,7 @@ function formatFechaCreacion(leccion: Leccion): string {
 
 export default function EstudianteView() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const [lecciones, setLecciones] = useState<Leccion[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -164,14 +166,15 @@ export default function EstudianteView() {
                   <div className="shrink-0 flex flex-col items-center justify-center gap-2">
                     <button
                       type="button"
-                      disabled
-                      title="El recorrido guiado llega en el Sprint 2"
-                      className="py-5 px-10 text-xl font-black uppercase tracking-wider rounded-2xl w-full md:w-auto btn-3d-green opacity-60 cursor-not-allowed"
+                      onClick={() =>
+                        navigate(`/estudiante/leccion/${leccion.id_leccion}/vocabulario`)
+                      }
+                      className="py-5 px-10 text-xl font-black uppercase tracking-wider rounded-2xl w-full md:w-auto btn-3d-green cursor-pointer"
                     >
                       EMPEZAR LECCIÓN
                     </button>
                     <p className="text-[10px] text-slate-400 font-bold">
-                      Disponible en el Sprint 2
+                      Recorrido guiado de 5 etapas
                     </p>
                   </div>
                 </div>
