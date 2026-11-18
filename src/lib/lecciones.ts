@@ -1,8 +1,12 @@
 import { supabase } from "./supabase";
 import type {
+  ConstruccionOracion,
+  Evaluacion,
   Gramatica,
   GramaticaColumna,
   Leccion,
+  Pregunta,
+  Pronunciacion,
   Vocabulario,
 } from "../types/database";
 
@@ -34,6 +38,27 @@ export type GramaticaInput = {
 export type LeccionConContenido = Leccion & {
   vocabulario: VocabularioItem[];
   gramatica: GramaticaInput | null;
+  oraciones: OracionItem[];
+  pronunciaciones: PronunciacionItem[];
+  preguntas: PreguntaItem[];
+};
+
+export type OracionItem = {
+  espanol: string;
+  ingles: string;
+};
+
+export type PronunciacionItem = {
+  ingles: string;
+};
+
+export type PreguntaItem = {
+  enunciado: string;
+  alternativa_a: string;
+  alternativa_b: string;
+  alternativa_c: string;
+  alternativa_d: string;
+  respuesta_correcta: "A" | "B" | "C" | "D";
 };
 
 export type LeccionInput = {
@@ -42,6 +67,9 @@ export type LeccionInput = {
   estado_activo: boolean;
   vocabulario?: VocabularioItem[];
   gramatica?: GramaticaInput;
+  oraciones?: OracionItem[];
+  pronunciaciones?: PronunciacionItem[];
+  preguntas?: PreguntaItem[];
 };
 
 export const DEFAULT_GRAMATICA_TITULO = "PRESENT SIMPLE";
@@ -117,13 +145,24 @@ async function hydrateLeccionesContenido(
 
   const ids = lecciones.map((l) => l.id_leccion);
 
-  const [vocabRes, gramRes] = await Promise.all([
+  const [vocabRes, gramRes, oracRes, pronRes, evalRes] = await Promise.all([
     supabase
       .from("vocabulario")
       .select("*")
       .in("id_leccion", ids)
       .order("orden", { ascending: true }),
     supabase.from("gramatica").select("*").in("id_leccion", ids),
+    supabase
+      .from("construccion_oracion")
+      .select("*")
+      .in("id_leccion", ids)
+      .order("orden", { ascending: true }),
+    supabase
+      .from("pronunciacion")
+      .select("*")
+      .in("id_leccion", ids)
+      .order("orden", { ascending: true }),
+    supabase.from("evaluacion").select("*").in("id_leccion", ids),
   ]);
 
   let vocabRows: Vocabulario[] = [];
@@ -146,6 +185,55 @@ async function hydrateLeccionesContenido(
     gramRows = (gramRes.data ?? []) as Gramatica[];
   }
 
+  let oracRows: ConstruccionOracion[] = [];
+  if (oracRes.error) {
+    console.warn(
+      "No se pudieron cargar oraciones (migración pendiente?):",
+      oracRes.error.message,
+    );
+  } else {
+    oracRows = (oracRes.data ?? []) as ConstruccionOracion[];
+  }
+
+  let pronRows: Pronunciacion[] = [];
+  if (pronRes.error) {
+    console.warn(
+      "No se pudo cargar pronunciación (migración pendiente?):",
+      pronRes.error.message,
+    );
+  } else {
+    pronRows = (pronRes.data ?? []) as Pronunciacion[];
+  }
+
+  let evalRows: Evaluacion[] = [];
+  if (evalRes.error) {
+    console.warn(
+      "No se pudo cargar la evaluación (migración pendiente?):",
+      evalRes.error.message,
+    );
+  } else {
+    evalRows = (evalRes.data ?? []) as Evaluacion[];
+  }
+
+  let questionRows: Pregunta[] = [];
+  if (evalRows.length > 0) {
+    const evalIds = evalRows.map((e) => e.id_evaluacion);
+    const { data: questionData, error: questionError } = await supabase
+      .from("pregunta")
+      .select("*")
+      .in("id_evaluacion", evalIds)
+      .order("orden", { ascending: true });
+
+    if (questionError) {
+      console.warn(
+        "No se pudieron cargar las preguntas (migración pendiente?):",
+        questionError.message,
+      );
+    } else {
+      questionRows = (questionData ?? []) as Pregunta[];
+    }
+  }
+
   const vocabByLesson = new Map<string, VocabularioItem[]>();
   for (const row of vocabRows) {
     const list = vocabByLesson.get(row.id_leccion) ?? [];
@@ -155,6 +243,45 @@ async function hydrateLeccionesContenido(
       categoria: "Sustantivo",
     });
     vocabByLesson.set(row.id_leccion, list);
+  }
+
+  const oracByLesson = new Map<string, OracionItem[]>();
+  for (const row of oracRows) {
+    const list = oracByLesson.get(row.id_leccion) ?? [];
+    list.push({
+      espanol: row.oracion_espanol,
+      ingles: row.respuesta_correcta,
+    });
+    oracByLesson.set(row.id_leccion, list);
+  }
+
+  const pronByLesson = new Map<string, PronunciacionItem[]>();
+  for (const row of pronRows) {
+    const list = pronByLesson.get(row.id_leccion) ?? [];
+    list.push({ ingles: row.oracion_ingles });
+    pronByLesson.set(row.id_leccion, list);
+  }
+
+  const lessonIdByEvaluacion = new Map<number, string>();
+  for (const row of evalRows) {
+    lessonIdByEvaluacion.set(row.id_evaluacion, row.id_leccion);
+  }
+
+  const preguntasByLesson = new Map<string, PreguntaItem[]>();
+  for (const row of questionRows) {
+    const idLeccion = lessonIdByEvaluacion.get(row.id_evaluacion);
+    if (!idLeccion) continue;
+
+    const list = preguntasByLesson.get(idLeccion) ?? [];
+    list.push({
+      enunciado: row.enunciado,
+      alternativa_a: row.alternativa_a,
+      alternativa_b: row.alternativa_b,
+      alternativa_c: row.alternativa_c,
+      alternativa_d: row.alternativa_d,
+      respuesta_correcta: row.respuesta_correcta,
+    });
+    preguntasByLesson.set(idLeccion, list);
   }
 
   const gramByLesson = new Map<string, GramaticaInput>();
@@ -175,6 +302,9 @@ async function hydrateLeccionesContenido(
     ...leccion,
     vocabulario: vocabByLesson.get(leccion.id_leccion) ?? [],
     gramatica: gramByLesson.get(leccion.id_leccion) ?? null,
+    oraciones: oracByLesson.get(leccion.id_leccion) ?? [],
+    pronunciaciones: pronByLesson.get(leccion.id_leccion) ?? [],
+    preguntas: preguntasByLesson.get(leccion.id_leccion) ?? [],
   }));
 }
 
@@ -314,6 +444,148 @@ export async function saveLeccion(
     if (insGramError) {
       console.error("Error inserting gramatica:", insGramError);
       throw new Error("No se pudo guardar la gramática de la lección.");
+    }
+  }
+
+  if (input.oraciones !== undefined) {
+    const { error: delOracError } = await supabase
+      .from("construccion_oracion")
+      .delete()
+      .eq("id_leccion", id);
+
+    if (delOracError) {
+      console.error("Error clearing construccion_oracion:", delOracError);
+      throw new Error("No se pudieron actualizar las oraciones de la lección.");
+    }
+
+    const validOraciones = input.oraciones.filter(
+      (o) => o.espanol.trim() !== "" && o.ingles.trim() !== "",
+    );
+
+    if (validOraciones.length > 0) {
+      const oracPayload = validOraciones.map((o, idx) => ({
+        id_leccion: id,
+        oracion_espanol: o.espanol.trim(),
+        respuesta_correcta: o.ingles.trim(),
+        orden: idx + 1,
+      }));
+
+      const { error: insOracError } = await supabase
+        .from("construccion_oracion")
+        .insert(oracPayload);
+
+      if (insOracError) {
+        console.error("Error inserting construccion_oracion:", insOracError);
+        throw new Error("No se pudieron guardar las oraciones de la lección.");
+      }
+    }
+  }
+
+  if (input.pronunciaciones !== undefined) {
+    const { error: delPronError } = await supabase
+      .from("pronunciacion")
+      .delete()
+      .eq("id_leccion", id);
+
+    if (delPronError) {
+      console.error("Error clearing pronunciacion:", delPronError);
+      throw new Error(
+        "No se pudieron actualizar las pronunciaciones de la lección.",
+      );
+    }
+
+    const validPronunciaciones = input.pronunciaciones.filter(
+      (p) => p.ingles.trim() !== "",
+    );
+
+    if (validPronunciaciones.length > 0) {
+      const pronPayload = validPronunciaciones.map((p, idx) => ({
+        id_leccion: id,
+        oracion_ingles: p.ingles.trim(),
+        orden: idx + 1,
+      }));
+
+      const { error: insPronError } = await supabase
+        .from("pronunciacion")
+        .insert(pronPayload);
+
+      if (insPronError) {
+        console.error("Error inserting pronunciacion:", insPronError);
+        throw new Error(
+          "No se pudieron guardar las pronunciaciones de la lección.",
+        );
+      }
+    }
+  }
+
+  if (input.preguntas !== undefined) {
+    const { data: evalRow, error: evalSelectError } = await supabase
+      .from("evaluacion")
+      .select("id_evaluacion")
+      .eq("id_leccion", id)
+      .maybeSingle();
+
+    if (evalSelectError) {
+      console.error("Error fetching evaluacion:", evalSelectError);
+      throw new Error("No se pudo verificar la evaluación de la lección.");
+    }
+
+    let idEvaluacion: number | null = evalRow?.id_evaluacion ?? null;
+
+    if (idEvaluacion === null) {
+      const { data: evalInserted, error: evalInsertError } = await supabase
+        .from("evaluacion")
+        .insert({ id_leccion: id })
+        .select("id_evaluacion")
+        .single();
+
+      if (evalInsertError) {
+        console.error("Error inserting evaluacion:", evalInsertError);
+        throw new Error("No se pudo crear la evaluación de la lección.");
+      }
+
+      idEvaluacion = (evalInserted as Evaluacion).id_evaluacion;
+    }
+
+    const { error: delPregError } = await supabase
+      .from("pregunta")
+      .delete()
+      .eq("id_evaluacion", idEvaluacion);
+
+    if (delPregError) {
+      console.error("Error clearing pregunta:", delPregError);
+      throw new Error("No se pudieron actualizar las preguntas de la lección.");
+    }
+
+    const validPreguntas = input.preguntas.filter(
+      (p) =>
+        p.enunciado.trim() !== "" &&
+        p.alternativa_a.trim() !== "" &&
+        p.alternativa_b.trim() !== "" &&
+        p.alternativa_c.trim() !== "" &&
+        p.alternativa_d.trim() !== "",
+    );
+
+    if (validPreguntas.length > 0) {
+      const pregPayload = validPreguntas.map((p, idx) => ({
+        id_evaluacion: idEvaluacion,
+        enunciado: p.enunciado.trim(),
+        alternativa_a: p.alternativa_a.trim().slice(0, 100),
+        alternativa_b: p.alternativa_b.trim().slice(0, 100),
+        alternativa_c: p.alternativa_c.trim().slice(0, 100),
+        alternativa_d: p.alternativa_d.trim().slice(0, 100),
+        respuesta_correcta: p.respuesta_correcta,
+        orden: idx + 1,
+      }));
+
+      const { error: insPregError } = await supabase
+        .from("pregunta")
+        .insert(pregPayload);
+
+      if (insPregError) {
+        console.error("Error inserting pregunta:", insPregError);
+        throw new Error("No se pudieron guardar las preguntas de la lección.");
+      }
     }
   }
 

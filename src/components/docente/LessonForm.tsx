@@ -15,10 +15,16 @@ import {
   DEFAULT_GRAMATICA_TITULO,
   type LeccionConContenido,
   type LeccionInput,
+  type OracionItem,
+  type PreguntaItem,
+  type PronunciacionItem,
   type VocabularioItem,
 } from "../../lib/lecciones";
 import VocabTable from "./VocabTable";
 import GrammarExampleSection from "./GrammarExampleSection";
+import SentenceTable from "./SentenceTable";
+import PronunciationTable from "./PronunciationTable";
+import QuestionTable from "./QuestionTable";
 
 interface LessonFormProps {
   editingLesson: LeccionConContenido | null;
@@ -214,6 +220,15 @@ export default function LessonForm({
   const [ejemploRoles, setEjemploRoles] = useState<string[]>(
     () => [...(editingLesson?.gramatica?.ejemplo_roles ?? [])],
   );
+  const [oraciones, setOraciones] = useState<OracionItem[]>(
+    () => editingLesson?.oraciones?.map((item) => ({ ...item })) ?? [],
+  );
+  const [pronunciaciones, setPronunciaciones] = useState<PronunciacionItem[]>(
+    () => editingLesson?.pronunciaciones?.map((item) => ({ ...item })) ?? [],
+  );
+  const [preguntas, setPreguntas] = useState<PreguntaItem[]>(
+    () => editingLesson?.preguntas?.map((item) => ({ ...item })) ?? [],
+  );
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -234,6 +249,9 @@ export default function LessonForm({
     setGramaticaColumnas(cloneDefaultColumnas());
     setEjemploOracion("");
     setEjemploRoles([]);
+    setOraciones([]);
+    setPronunciaciones([]);
+    setPreguntas([]);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -276,6 +294,9 @@ export default function LessonForm({
           gramatica_columnas: gramaticaColumnas,
           ejemplo_roles: ejemploRoles,
         },
+        oraciones,
+        pronunciaciones,
+        preguntas,
       });
 
       setSuccess(
@@ -619,6 +640,28 @@ export default function LessonForm({
             }}
             onChangeRoles={setEjemploRoles}
           />
+        </SectionAccordion>
+
+        {/* 4. ORACIONES PARA ARMAR */}
+        <SectionAccordion number="4" title="Oraciones para armar" defaultOpen={true}>
+          <SentenceTable oraciones={oraciones} onChange={setOraciones} />
+        </SectionAccordion>
+
+        {/* 5. PRONUNCIACIÓN */}
+        <SectionAccordion number="5" title="Pronunciación" defaultOpen={true}>
+          <PronunciationTable
+            pronunciaciones={pronunciaciones}
+            onChange={setPronunciaciones}
+          />
+        </SectionAccordion>
+
+        {/* 6. PREGUNTAS DE EVALUACIÓN */}
+        <SectionAccordion
+          number="6"
+          title="Preguntas de evaluación (A/B/C/D)"
+          defaultOpen={true}
+        >
+          <QuestionTable preguntas={preguntas} onChange={setPreguntas} />
         </SectionAccordion>
 
         {error && (
