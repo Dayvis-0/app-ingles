@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Award,
-  BookOpen,
   CheckCircle2,
   ClipboardCheck,
   Mic,
@@ -22,6 +21,7 @@ import {
   type VocabularioItem,
 } from "../../lib/lecciones";
 import LessonProgressBar from "./LessonProgressBar";
+import VocabularioStep from "./VocabularioStep";
 import { ETAPAS_LECCION } from "./etapas";
 import { ModalConfirm } from "../ui";
 
@@ -253,45 +253,7 @@ export default function EstudianteLeccionView() {
         ) : (
           <section className="duo-card p-6 md:p-8 bg-white space-y-6">
             {currentStep.key === "vocabulario" && (
-              <div className="space-y-6">
-                <div className="text-center space-y-1">
-                  <span className="text-xs md:text-sm font-black uppercase tracking-[0.12em] text-[#1cb0f6] block">
-                    ETAPA 1 DE 5 · VOCABULARIO INICIAL
-                  </span>
-                  <h1 className="text-2xl md:text-3xl font-black text-slate-800">
-                    Palabras Clave de la Lección
-                  </h1>
-                  <p className="text-sm text-slate-500 font-medium">
-                    Revisá el vocabulario esencial antes de pasar a la gramática.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {vocabItems.map((item, idx) => (
-                    <div
-                      key={`${item.ingles}-${idx}`}
-                      className="p-4 rounded-2xl border-2 border-slate-200 bg-slate-50/60 hover:border-sky-300 transition-colors flex items-center justify-between gap-3"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-sky-100 text-[#1cb0f6] flex items-center justify-center shrink-0">
-                          <BookOpen className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-lg font-black text-slate-800 font-mono truncate">
-                            {item.ingles}
-                          </p>
-                          <p className="text-sm font-bold text-slate-500 truncate">
-                            {item.espanol}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-black uppercase px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 shrink-0">
-                        {item.categoria}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <VocabularioStep palabras={vocabItems} />
             )}
 
             {currentStep.key === "gramatica" && (
