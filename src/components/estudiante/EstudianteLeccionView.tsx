@@ -23,6 +23,7 @@ import {
 } from "../../lib/lecciones";
 import LessonProgressBar from "./LessonProgressBar";
 import { ETAPAS_LECCION } from "./etapas";
+import { ModalConfirm } from "../ui";
 
 type LoadState = "loading" | "error" | "not_found" | "ready";
 
@@ -44,6 +45,7 @@ export default function EstudianteLeccionView() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedTour, setCompletedTour] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [activeGrammarWordIdx, setActiveGrammarWordIdx] = useState<
     number | null
   >(null);
@@ -126,6 +128,19 @@ export default function EstudianteLeccionView() {
     navigate("/estudiante");
   };
 
+  const requestExitTour = () => {
+    if (completedTour) {
+      navigate("/estudiante");
+      return;
+    }
+    setShowExitConfirm(true);
+  };
+
+  const confirmExitTour = () => {
+    setShowExitConfirm(false);
+    navigate("/estudiante");
+  };
+
   if (loadState === "loading") {
     return (
       <div className="min-h-screen flex flex-col bg-[#f7f7f7] items-center justify-center p-4">
@@ -192,7 +207,7 @@ export default function EstudianteLeccionView() {
         currentStepIndex={currentStepIndex}
         lessonTitle={leccion.titulo}
         onSelectStep={goToStep}
-        onBackToMenu={handleBackToMenu}
+        onBackToMenu={requestExitTour}
       />
 
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 md:py-8 flex flex-col justify-between gap-6">
@@ -540,6 +555,17 @@ export default function EstudianteLeccionView() {
           </footer>
         )}
       </main>
+
+      <ModalConfirm
+        isOpen={showExitConfirm}
+        title="Salir del recorrido"
+        message="¿Seguro que querés salir? Vas a perder tu avance en esta lección."
+        confirmText="Sí, salir"
+        cancelText="Seguir practicando"
+        variant="warning"
+        onConfirm={confirmExitTour}
+        onCancel={() => setShowExitConfirm(false)}
+      />
     </div>
   );
 }
