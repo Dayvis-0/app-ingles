@@ -24,6 +24,7 @@ import LessonProgressBar from "./LessonProgressBar";
 import VocabularioStep from "./VocabularioStep";
 import { ETAPAS_LECCION } from "./etapas";
 import { ModalConfirm } from "../ui";
+import { speakWord } from "../../lib/tts";
 
 type LoadState = "loading" | "error" | "not_found" | "ready";
 
@@ -46,6 +47,7 @@ export default function EstudianteLeccionView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedTour, setCompletedTour] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [vistosVocabulario, setVistosVocabulario] = useState<string[]>([]);
   const [activeGrammarWordIdx, setActiveGrammarWordIdx] = useState<
     number | null
   >(null);
@@ -62,6 +64,9 @@ export default function EstudianteLeccionView() {
         }
         return;
       }
+
+      // Each lesson starts with a clean vocabulary-feedback state.
+      setVistosVocabulario([]);
 
       try {
         const data = await fetchLeccionById(idLeccion);
@@ -95,6 +100,13 @@ export default function EstudianteLeccionView() {
   const matchedIndex = ETAPAS_LECCION.findIndex((s) => s.key === etapa);
   const currentStepIndex = matchedIndex >= 0 ? matchedIndex : 0;
   const currentStep = ETAPAS_LECCION[currentStepIndex];
+
+  const handleListenWord = (palabra: string) => {
+    void speakWord(palabra);
+    setVistosVocabulario((prev) =>
+      prev.includes(palabra) ? prev : [...prev, palabra],
+    );
+  };
 
   const goToStep = (index: number) => {
     if (!idLeccion) return;
@@ -253,7 +265,11 @@ export default function EstudianteLeccionView() {
         ) : (
           <section className="duo-card p-6 md:p-8 bg-white space-y-6">
             {currentStep.key === "vocabulario" && (
-              <VocabularioStep palabras={vocabItems} />
+              <VocabularioStep
+                palabras={vocabItems}
+                vistos={vistosVocabulario}
+                onListen={handleListenWord}
+              />
             )}
 
             {currentStep.key === "gramatica" && (
