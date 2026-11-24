@@ -1,14 +1,14 @@
 /**
  * Text-to-speech helper.
  *
- * Playback chain (best quality first):
- * 1. Google Translate TTS played directly by an <audio> element. index.html
- *    declares <meta name="referrer" content="no-referrer"> because Google
- *    rejects requests that carry a Referer header; media playback does not need
- *    CORS, so this yields the same natural voice the old project got through its
- *    server proxy without requiring a backend.
- * 2. `/api/tts` same-origin proxy, for when the Express/Vercel TTS service is
- *    available.
+ * Playback chain (mirrors the old project's flow):
+ * 1. `/api/tts` same-origin TTS service (Express in dev, bundled server in
+ *    production, HU07 - Yunior), which proxies Google Translate TTS with a
+ *    backup provider and returns 503 when every provider fails.
+ * 2. Google Translate TTS played directly by an <audio> element, for when the
+ *    app is served without the Express layer. index.html declares
+ *    <meta name="referrer" content="no-referrer"> because Google rejects
+ *    requests that carry a Referer header; media playback does not need CORS.
  * 3. Browser SpeechSynthesis as a last resort (voice quality depends on the
  *    voices installed on the device).
  */
@@ -44,17 +44,18 @@ export async function speakWord(text: string): Promise<void> {
   if (!clean) return;
 
   try {
-    await playUrl(googleTtsUrl(clean));
-    return;
-  } catch {
-    // Google TTS unavailable (offline, blocked or changed): try our proxy.
-  }
-
-  try {
     await playUrl(`/api/tts?text=${encodeURIComponent(clean)}`);
     return;
   } catch {
-    console.warn("[tts] Server TTS unavailable, falling back to SpeechSynthesis.");
+    // TTS service unavailable (Vite-only dev, static deploy or 503): use the
+    // direct Google stream before falling back to the system voice.
+  }
+
+  try {
+    await playUrl(googleTtsUrl(clean));
+    return;
+  } catch {
+    console.warn("[tts] TTS unavailable, falling back to SpeechSynthesis.");
   }
 
   speakWithBrowser(clean);
