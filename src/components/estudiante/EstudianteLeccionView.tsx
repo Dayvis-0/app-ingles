@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Mic,
-  Puzzle,
   RotateCcw,
 } from "lucide-react";
 import {
@@ -20,6 +19,7 @@ import {
   type LeccionConContenido,
   type VocabularioItem,
 } from "../../lib/lecciones";
+import ConstruccionStep from "./ConstruccionStep";
 import LessonProgressBar from "./LessonProgressBar";
 import VocabularioStep from "./VocabularioStep";
 import { ETAPAS_LECCION } from "./etapas";
@@ -48,6 +48,9 @@ export default function EstudianteLeccionView() {
   const [completedTour, setCompletedTour] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [vistosVocabulario, setVistosVocabulario] = useState<string[]>([]);
+  const [oracionesCompletadas, setOracionesCompletadas] = useState<number[]>(
+    [],
+  );
   const [activeGrammarWordIdx, setActiveGrammarWordIdx] = useState<
     number | null
   >(null);
@@ -67,6 +70,7 @@ export default function EstudianteLeccionView() {
 
       // Each lesson starts with a clean vocabulary-feedback state.
       setVistosVocabulario([]);
+      setOracionesCompletadas([]);
 
       try {
         const data = await fetchLeccionById(idLeccion);
@@ -105,6 +109,12 @@ export default function EstudianteLeccionView() {
     void speakWord(palabra);
     setVistosVocabulario((prev) =>
       prev.includes(palabra) ? prev : [...prev, palabra],
+    );
+  };
+
+  const handleOracionResuelta = (index: number) => {
+    setOracionesCompletadas((prev) =>
+      prev.includes(index) ? prev : [...prev, index],
     );
   };
 
@@ -383,49 +393,12 @@ export default function EstudianteLeccionView() {
             )}
 
             {currentStep.key === "construccion-de-oraciones" && (
-              <div className="space-y-6">
-                <div className="text-center space-y-1">
-                  <span className="text-xs md:text-sm font-black uppercase tracking-[0.12em] text-[#1cb0f6] block">
-                    ETAPA 3 DE 5 · CONSTRUCCIÓN DE ORACIONES
-                  </span>
-                  <h1 className="text-2xl md:text-3xl font-black text-slate-800">
-                    Práctica de Estructura y Orden
-                  </h1>
-                  <p className="text-sm text-slate-500 font-medium">
-                    Ordená los bloques de palabras siguiendo la fórmula{" "}
-                    <span className="font-mono font-bold text-slate-700">
-                      {grammarFormula}
-                    </span>
-                    .
-                  </p>
-                </div>
-
-                <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 space-y-4 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
-                    <Puzzle className="w-6 h-6" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-600">
-                    Vista previa de bloques de oración para{" "}
-                    <span className="text-slate-800 font-black">
-                      {leccion.titulo}
-                    </span>
-                    :
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2.5">
-                    {sentencePreviewWords.map((word, idx) => (
-                      <span
-                        key={`${word}-${idx}`}
-                        className="px-4 py-2 bg-white border-2 border-b-4 border-slate-200 rounded-xl font-extrabold text-slate-700 text-sm md:text-base"
-                      >
-                        {word}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs font-bold text-slate-400">
-                    La interacción completa con validación de frases se habilita en el Sprint 3.
-                  </p>
-                </div>
-              </div>
+              <ConstruccionStep
+                key={leccion.id_leccion}
+                oraciones={leccion.oraciones}
+                completadas={oracionesCompletadas}
+                onComplete={handleOracionResuelta}
+              />
             )}
 
             {currentStep.key === "pronunciacion" && (
