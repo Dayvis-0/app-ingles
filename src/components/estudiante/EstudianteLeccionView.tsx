@@ -7,7 +7,6 @@ import {
   Award,
   CheckCircle2,
   ClipboardCheck,
-  Mic,
   RotateCcw,
 } from "lucide-react";
 import {
@@ -21,6 +20,7 @@ import {
 } from "../../lib/lecciones";
 import ConstruccionStep from "./ConstruccionStep";
 import LessonProgressBar from "./LessonProgressBar";
+import PronunciacionStep from "./PronunciacionStep";
 import VocabularioStep from "./VocabularioStep";
 import { ETAPAS_LECCION } from "./etapas";
 import { ModalConfirm } from "../ui";
@@ -51,6 +51,7 @@ export default function EstudianteLeccionView() {
   const [oracionesCompletadas, setOracionesCompletadas] = useState<number[]>(
     [],
   );
+  const [frasesCompletadas, setFrasesCompletadas] = useState<number[]>([]);
   const [activeGrammarWordIdx, setActiveGrammarWordIdx] = useState<
     number | null
   >(null);
@@ -71,6 +72,7 @@ export default function EstudianteLeccionView() {
       // Each lesson starts with a clean vocabulary-feedback state.
       setVistosVocabulario([]);
       setOracionesCompletadas([]);
+      setFrasesCompletadas([]);
 
       try {
         const data = await fetchLeccionById(idLeccion);
@@ -114,6 +116,12 @@ export default function EstudianteLeccionView() {
 
   const handleOracionResuelta = (index: number) => {
     setOracionesCompletadas((prev) =>
+      prev.includes(index) ? prev : [...prev, index],
+    );
+  };
+
+  const handleFraseResuelta = (index: number) => {
+    setFrasesCompletadas((prev) =>
       prev.includes(index) ? prev : [...prev, index],
     );
   };
@@ -217,11 +225,14 @@ export default function EstudianteLeccionView() {
     .split(" ")
     .filter(Boolean);
   const grammarExampleRoles = leccion.gramatica?.ejemplo_roles ?? [];
-  const sentencePreviewWords = (
-    leccion.gramatica?.ejemplo || "She studies English every day"
-  )
-    .split(" ")
-    .filter(Boolean);
+  const frasesPronunciacion =
+    leccion.pronunciaciones.length > 0
+      ? leccion.pronunciaciones.map((pronunciacion) => pronunciacion.ingles)
+      : [
+          leccion.oraciones[0]?.ingles ??
+            leccion.gramatica?.ejemplo ??
+            "English is fun and easy",
+        ];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f7f7f7]">
@@ -402,31 +413,12 @@ export default function EstudianteLeccionView() {
             )}
 
             {currentStep.key === "pronunciacion" && (
-              <div className="space-y-6">
-                <div className="text-center space-y-1">
-                  <span className="text-xs md:text-sm font-black uppercase tracking-[0.12em] text-[#1cb0f6] block">
-                    ETAPA 4 DE 5 · PRÁCTICA DE PRONUNCIACIÓN
-                  </span>
-                  <h1 className="text-2xl md:text-3xl font-black text-slate-800">
-                    Entrenamiento de Voz en Inglés
-                  </h1>
-                  <p className="text-sm text-slate-500 font-medium">
-                    Practicá diciendo en voz alta las oraciones de la lección.
-                  </p>
-                </div>
-
-                <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 md:p-8 text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-sky-100 text-[#1cb0f6] flex items-center justify-center mx-auto">
-                    <Mic className="w-8 h-8" />
-                  </div>
-                  <p className="text-xl md:text-2xl font-black font-mono text-slate-800">
-                    “{sentencePreviewWords.join(" ")}”
-                  </p>
-                  <p className="text-xs font-bold text-slate-400 max-w-md mx-auto">
-                    El reconocimiento de voz y comparación por similitud se integran en el Sprint 3.
-                  </p>
-                </div>
-              </div>
+              <PronunciacionStep
+                key={leccion.id_leccion}
+                frases={frasesPronunciacion}
+                completadas={frasesCompletadas}
+                onComplete={handleFraseResuelta}
+              />
             )}
 
             {currentStep.key === "evaluacion" && (

@@ -13,8 +13,8 @@ import type { OracionItem } from "../../lib/lecciones";
 import {
   construirBurbujas,
   esRespuestaCorrecta,
-  normalizarFrase,
 } from "../../lib/oraciones";
+import { normalizarFrase } from "../../lib/texto";
 import { speakWord } from "../../lib/tts";
 
 type ConstruccionStepProps = {

@@ -4,6 +4,8 @@
  * generation can be verified without rendering React.
  */
 
+import { normalizarFrase, palabrasDe } from "./texto";
+
 /**
  * Common English words used as decoys. They are filtered against the sentence
  * words so a decoy never duplicates a real answer bubble.
@@ -27,24 +29,6 @@ const DISTRACTORES = [
   "between",
 ];
 
-/** Removes punctuation while keeping the word readable as a bubble. */
-function limpiarPalabra(palabra: string): string {
-  return palabra.replace(/[.,/#!$%^&*;:{}=\-_`~()?¿!¡"']/g, "");
-}
-
-/**
- * Normalizes an answer so keyboard input and bubbles compare the same way:
- * punctuation is dropped, casing is ignored and spacing is collapsed.
- */
-export function normalizarFrase(frase: string): string {
-  return frase
-    .split(/\s+/)
-    .map(limpiarPalabra)
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
 function mezclar<T>(items: T[]): T[] {
   const copia = [...items];
   for (let i = copia.length - 1; i > 0; i -= 1) {
@@ -56,11 +40,7 @@ function mezclar<T>(items: T[]): T[] {
 
 /** Returns the sentence words plus two decoys, in random order. */
 export function construirBurbujas(ingles: string): string[] {
-  const principales = ingles
-    .split(/\s+/)
-    .map(limpiarPalabra)
-    .filter(Boolean);
-
+  const principales = palabrasDe(ingles);
   const usadas = new Set(principales.map((palabra) => palabra.toLowerCase()));
   const disponibles = DISTRACTORES.filter(
     (distractor) => !usadas.has(distractor),
