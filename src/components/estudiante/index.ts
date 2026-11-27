@@ -1,5 +1,6 @@
 export { default as ConstruccionStep } from "./ConstruccionStep";
 export { default as EstudianteLeccionView } from "./EstudianteLeccionView";
+export { default as EvaluacionStep } from "./EvaluacionStep";
 export { default as LessonProgressBar } from "./LessonProgressBar";
 export { default as PronunciacionStep } from "./PronunciacionStep";
 export { default as VocabularioStep } from "./VocabularioStep";

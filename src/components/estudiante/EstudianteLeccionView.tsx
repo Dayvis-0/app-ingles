@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Award,
   CheckCircle2,
-  ClipboardCheck,
   RotateCcw,
 } from "lucide-react";
 import {
@@ -19,12 +18,14 @@ import {
   type VocabularioItem,
 } from "../../lib/lecciones";
 import ConstruccionStep from "./ConstruccionStep";
+import EvaluacionStep from "./EvaluacionStep";
 import LessonProgressBar from "./LessonProgressBar";
 import PronunciacionStep from "./PronunciacionStep";
 import VocabularioStep from "./VocabularioStep";
 import { ETAPAS_LECCION } from "./etapas";
 import { ModalConfirm } from "../ui";
 import { speakWord } from "../../lib/tts";
+import type { ResultadoEvaluacion } from "../../lib/evaluacion";
 
 type LoadState = "loading" | "error" | "not_found" | "ready";
 
@@ -52,6 +53,8 @@ export default function EstudianteLeccionView() {
     [],
   );
   const [frasesCompletadas, setFrasesCompletadas] = useState<number[]>([]);
+  const [resultadoEvaluacion, setResultadoEvaluacion] =
+    useState<ResultadoEvaluacion | null>(null);
   const [activeGrammarWordIdx, setActiveGrammarWordIdx] = useState<
     number | null
   >(null);
@@ -73,6 +76,7 @@ export default function EstudianteLeccionView() {
       setVistosVocabulario([]);
       setOracionesCompletadas([]);
       setFrasesCompletadas([]);
+      setResultadoEvaluacion(null);
 
       try {
         const data = await fetchLeccionById(idLeccion);
@@ -130,6 +134,7 @@ export default function EstudianteLeccionView() {
     if (!idLeccion) return;
     const bounded = Math.max(0, Math.min(index, ETAPAS_LECCION.length - 1));
     setCompletedTour(false);
+    setResultadoEvaluacion(null);
     setActiveGrammarWordIdx(null);
     navigate(`/estudiante/leccion/${idLeccion}/${ETAPAS_LECCION[bounded].key}`, {
       replace: true,
@@ -264,6 +269,48 @@ export default function EstudianteLeccionView() {
                 . Podés repasar cualquier etapa o volver a tu lista de lecciones.
               </p>
             </div>
+
+            {resultadoEvaluacion && (
+              <div className="max-w-md w-full mx-auto rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+                    Nota final
+                  </span>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                      resultadoEvaluacion.aprobado
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {resultadoEvaluacion.aprobado ? "Aprobado" : "Desaprobado"}
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-center gap-1">
+                  <span
+                    className={`text-5xl font-black ${
+                      resultadoEvaluacion.aprobado
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    }`}
+                  >
+                    {resultadoEvaluacion.nota}
+                  </span>
+                  <span className="text-lg font-bold text-slate-400">/ 20</span>
+                </div>
+
+                <p className="text-sm font-bold text-slate-500">
+                  {resultadoEvaluacion.aciertos} de{" "}
+                  {resultadoEvaluacion.totalPreguntas} respuestas correctas
+                </p>
+                <p className="text-xs font-bold text-slate-400">
+                  {resultadoEvaluacion.aprobado
+                    ? "¡Alcanzaste la nota mínima para aprobar!"
+                    : "No alcanzaste la nota mínima para aprobar."}
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <button
@@ -422,40 +469,19 @@ export default function EstudianteLeccionView() {
             )}
 
             {currentStep.key === "evaluacion" && (
-              <div className="space-y-6">
-                <div className="text-center space-y-1">
-                  <span className="text-xs md:text-sm font-black uppercase tracking-[0.12em] text-[#1cb0f6] block">
-                    ETAPA 5 DE 5 · EVALUACIÓN FINAL
-                  </span>
-                  <h1 className="text-2xl md:text-3xl font-black text-slate-800">
-                    Comprobá lo Aprendido
-                  </h1>
-                  <p className="text-sm text-slate-500 font-medium">
-                    Última etapa del recorrido con preguntas de opción múltiple A/B/C/D.
-                  </p>
-                </div>
-
-                <div className="bg-emerald-50/60 border-2 border-emerald-200 rounded-2xl p-6 md:p-8 text-center space-y-4">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                    <ClipboardCheck className="w-7 h-7" />
-                  </div>
-                  <h2 className="text-lg font-black text-slate-800">
-                    Estás en la Etapa 5 de 5 de {leccion.titulo}
-                  </h2>
-                  <p className="text-sm font-semibold text-slate-600 max-w-md mx-auto">
-                    Al presionar{" "}
-                    <span className="font-black text-emerald-700">
-                      FINALIZAR RECORRIDO
-                    </span>{" "}
-                    completás el flujo guiado de las 5 etapas. La calificación automática 0–20 se incorpora en el Sprint 4.
-                  </p>
-                </div>
-              </div>
+              <EvaluacionStep
+                key={leccion.id_leccion}
+                preguntas={leccion.preguntas}
+                onFinish={(resultado) => {
+                  setResultadoEvaluacion(resultado);
+                  setCompletedTour(true);
+                }}
+              />
             )}
           </section>
         )}
 
-        {!completedTour && (
+        {!completedTour && currentStep.key !== "evaluacion" && (
           <footer className="bg-white border-2 border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
             <div className="text-center sm:text-left">
               <p className="text-xs font-black uppercase tracking-wider text-slate-400">
